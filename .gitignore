@@ -1,0 +1,36 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environment and packages
+.env
+.venv/
+env/
+venv/
+*.egg-info/
+*.egg
+
+# Jupyter/IPython
+.ipynb_checkpoints/
+
+# Backup and patch folders
+backup/
+uploaded_project/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# Report downloads
+*.md
+
+# Logs or temp
+*.log
+*.tmp
