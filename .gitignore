@@ -1,36 +1,44 @@
-# Python cache and compiled files
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
-
-# Environment and packages
-.env
-.venv/
-env/
-venv/
 *.egg-info/
-*.egg
+.env
+*.env
 
-# Jupyter/IPython
-.ipynb_checkpoints/
+# Virtual environments
+venv/
 
-# Backup and patch folders
-backup/
+# VSCode / IDE / Editor settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Streamlit cache
+.streamlit/config.toml
+.streamlit/*.json
+
+# Project-specific folders
 uploaded_project/
+backup/
+__results__/
+__reports__/
+*.log
 
 # System files
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# VSCode / PyCharm
-.vscode/
-.idea/
-
-# Report downloads
+# Zip uploads & generated reports
+*.zip
 *.md
-
-# Logs or temp
-*.log
 *.tmp
+*.bak
+
+# Notebooks (if added later)
+*.ipynb_checkpoints

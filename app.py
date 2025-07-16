@@ -1,15 +1,15 @@
-
 import streamlit as st
 import zipfile
 import os
 import io
 import shutil
-from scanner.secrets import scan_secrets
-from scanner.unsafe_calls import scan_unsafe_calls
-from scanner.jwt_check import scan_jwt
+from scanners.python.secrets import scan_secrets
+from scanners.python.unsafe_calls import scan_unsafe_calls
+from scanners.python.jwt_check import scan_jwt
 from gpt_fixer import generate_fix_with_openrouter
 from code_utils import extract_code_snippet
 from patcher import apply_patch
+from update_manager import auto_patch_all  # ✅ NEW
 
 st.set_page_config(page_title="Defender App", layout="wide")
 st.title("🛡️ Defender App - Secure Your Vibe Code")
@@ -25,7 +25,7 @@ if uploaded_file:
 
     st.success("✅ Project extracted. Scanning...")
 
-    # Run all scanners
+    # Run all Python-specific scanners (Phase 2 logic)
     secret_results = scan_secrets(extract_path)
     unsafe_results = scan_unsafe_calls(extract_path)
     jwt_results = scan_jwt(extract_path)
@@ -33,7 +33,7 @@ if uploaded_file:
     st.subheader("🔐 Hardcoded Secrets")
     for item in secret_results:
         with st.expander(f"{item['file']} : Line {item['line']}"):
-            st.code(item['code'])
+            st.code(item['code'], language=item.get("language", "python"))
             st.error(item['issue'])
             st.info(item['fix'])
 
@@ -41,19 +41,32 @@ if uploaded_file:
     for item in unsafe_results:
         with st.expander(f"{item['file']} : Line {item['line']}"):
             code_snippet = extract_code_snippet(item['file'], item['line'])
-            st.code(code_snippet, language="python")
+            st.code(code_snippet, language=item.get("language", "python"))
             st.error(item['issue'])
             st.info(item['fix'])
 
             if st.button(f"🔮 Generate Fix with AI ({item['file']}:{item['line']})", key=f"fix_{item['file']}_{item['line']}"):
                 with st.spinner("Asking AI..."):
-                    suggestion = generate_fix_with_openrouter(code_snippet, item['issue'])
+                    suggestion = generate_fix_with_openrouter(
+                        code_snippet,
+                        item['issue'],
+                        item.get("language", "python")
+                    )
                     st.success("Here is the suggested secure fix:")
-                    st.code(suggestion, language="python")
+                    st.code(suggestion, language=item.get("language", "python"))
 
                     if st.button(f"💾 Apply Fix to {item['file']}:{item['line']}", key=f"patch_{item['file']}_{item['line']}"):
                         result = apply_patch(item['file'], item['line'], code_snippet, suggestion)
                         st.success(result)
+
+    # ✅ NEW BUTTON: AUTO FIX ALL
+    if unsafe_results:
+        st.markdown("---")
+        if st.button("💥 Auto-Fix All Unsafe Issues with AI"):
+            with st.spinner("Fixing all issues..."):
+                fix_results = auto_patch_all(unsafe_results)
+                for res in fix_results:
+                    st.write(f"📄 `{res['file']}` Line {res['line']}: {res['status']}")
 
     st.subheader("🔓 JWT Issues")
     for item in jwt_results:

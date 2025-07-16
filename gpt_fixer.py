@@ -1,13 +1,12 @@
-# gpt_fixer.py
 import requests
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def generate_fix_with_openrouter(code_snippet, issue_description):
+def generate_fix_with_openrouter(code_snippet, issue_description, language="python"):
     prompt = f"""
-The following Python code has a security issue:
+The following {language} code has a security issue:
 {issue_description}
 
 Please rewrite it securely and explain the changes.
@@ -26,8 +25,14 @@ Code:
     data = {
         "model": "deepseek/deepseek-chat-v3-0324",  # You can change this model
         "messages": [
-            {"role": "system", "content": "You are a secure Python coding assistant."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": f"You are a secure coding assistant that fixes vulnerabilities in {language}."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
         ]
     }
 

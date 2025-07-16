@@ -13,7 +13,8 @@ def ensure_backup(file_path):
 
 def apply_patch(file_path, line_number, original_code, new_code):
     """
-    Replace code at a given line number (± context) with the new AI-generated code.
+    Replace the original line with new secure code at the given line_number.
+    Works across any language (Python, JS, C++, etc).
     """
 
     ensure_backup(file_path)
@@ -22,24 +23,24 @@ def apply_patch(file_path, line_number, original_code, new_code):
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
 
-        # Determine the best line to replace (exact match or surrounding)
-        patch_block_start = max(0, line_number - 3)
-        patch_block_end = min(len(lines), line_number + 2)
+        original_line = lines[line_number - 1].strip()
+        if original_code.strip() not in original_line:
+            return f"⚠️ Original code mismatch at {file_path}:{line_number}. Patch skipped."
 
-        # Replace block with GPT output (split into lines)
-        new_code_lines = new_code.strip().splitlines(keepends=False)
-        new_code_lines = [line + '\n' for line in new_code_lines]
+        # Respect existing indentation
+        indent = len(lines[line_number - 1]) - len(lines[line_number - 1].lstrip())
+        indent_spaces = " " * indent
 
-        updated_lines = (
-            lines[:patch_block_start] +
-            new_code_lines +
-            lines[patch_block_end:]
-        )
+        # Insert new code with matching indent
+        new_code_lines = new_code.strip().splitlines()
+        indented_lines = [(indent_spaces + line).rstrip() + '\n' for line in new_code_lines]
+
+        lines[line_number - 1] = "".join(indented_lines)
 
         with open(file_path, 'w', encoding='utf-8') as f:
-            f.writelines(updated_lines)
+            f.writelines(lines)
 
-        return f"✅ Patch applied to {file_path} (original backed up in /{BACKUP_DIR})"
+        return f"✅ Patch applied to {file_path}:{line_number} (original backed up in /{BACKUP_DIR})"
 
     except Exception as e:
         return f"❌ Failed to apply patch: {str(e)}"
