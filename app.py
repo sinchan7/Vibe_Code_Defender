@@ -3,16 +3,19 @@ import zipfile
 import os
 import io
 import shutil
-from scanners.python.secrets import scan_secrets
-from scanners.python.unsafe_calls import scan_unsafe_calls
-from scanners.python.jwt_check import scan_jwt
+
+from scanner_manager import scan_project
 from gpt_fixer import generate_fix_with_openrouter
 from code_utils import extract_code_snippet
 from patcher import apply_patch
-from update_manager import auto_patch_all  # ✅ NEW
+from update_manager import auto_patch_all
 
 st.set_page_config(page_title="Defender App", layout="wide")
 st.title("🛡️ Defender App - Secure Your Vibe Code")
+
+# ✅ Language Filter
+LANGUAGE_OPTIONS = ["python", "javascript", "java", "cpp", "html", "css"]
+selected_languages = st.multiselect("Select languages to scan", LANGUAGE_OPTIONS, default=LANGUAGE_OPTIONS)
 
 uploaded_file = st.file_uploader("Upload your project ZIP file", type=["zip"])
 
@@ -25,15 +28,13 @@ if uploaded_file:
 
     st.success("✅ Project extracted. Scanning...")
 
-    # Run all Python-specific scanners (Phase 2 logic)
-    secret_results = scan_secrets(extract_path)
-    unsafe_results = scan_unsafe_calls(extract_path)
-    jwt_results = scan_jwt(extract_path)
+    # 🔍 Multi-language Scanner Manager
+    secret_results, unsafe_results, jwt_results = scan_project(extract_path, selected_languages)
 
     st.subheader("🔐 Hardcoded Secrets")
     for item in secret_results:
         with st.expander(f"{item['file']} : Line {item['line']}"):
-            st.code(item['code'], language=item.get("language", "python"))
+            st.code(item['code'], language=item.get("language", "text"))
             st.error(item['issue'])
             st.info(item['fix'])
 
@@ -41,7 +42,7 @@ if uploaded_file:
     for item in unsafe_results:
         with st.expander(f"{item['file']} : Line {item['line']}"):
             code_snippet = extract_code_snippet(item['file'], item['line'])
-            st.code(code_snippet, language=item.get("language", "python"))
+            st.code(code_snippet, language=item.get("language", "text"))
             st.error(item['issue'])
             st.info(item['fix'])
 
@@ -50,16 +51,16 @@ if uploaded_file:
                     suggestion = generate_fix_with_openrouter(
                         code_snippet,
                         item['issue'],
-                        item.get("language", "python")
+                        item.get("language", "text")
                     )
                     st.success("Here is the suggested secure fix:")
-                    st.code(suggestion, language=item.get("language", "python"))
+                    st.code(suggestion, language=item.get("language", "text"))
 
                     if st.button(f"💾 Apply Fix to {item['file']}:{item['line']}", key=f"patch_{item['file']}_{item['line']}"):
                         result = apply_patch(item['file'], item['line'], code_snippet, suggestion)
                         st.success(result)
 
-    # ✅ NEW BUTTON: AUTO FIX ALL
+    # ✅ Auto Patch Button
     if unsafe_results:
         st.markdown("---")
         if st.button("💥 Auto-Fix All Unsafe Issues with AI"):
@@ -74,7 +75,7 @@ if uploaded_file:
             st.error(item['issue'])
             st.info(item['fix'])
 
-    # Combine all results into one string
+    # 📝 Markdown Report Generation
     def generate_report_text(secret_results, unsafe_results, jwt_results):
         report = "# 🛡️ Defender App Scan Report\n\n"
 
@@ -105,7 +106,6 @@ if uploaded_file:
 
         return report
 
-    # Generate and show download button
     report_content = generate_report_text(secret_results, unsafe_results, jwt_results)
     report_bytes = io.BytesIO(report_content.encode("utf-8"))
 

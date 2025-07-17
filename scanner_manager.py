@@ -1,51 +1,62 @@
-from detectors.language_detector import detect_languages
-from scanners.python import secrets, unsafe_calls, jwt_check
-from scanners.javascript.eslint_scanner import scan_files as scan_js
-from scanners.java.java_scanner import scan_files as scan_java
-from scanners.cpp.cpp_scanner import scan_files as scan_cpp
-from scanners.html.html_scanner import scan_files as scan_html
-from scanners.css.css_scanner import scan_files as scan_css
-from scanners.multi.semgrep_scanner import scan_files as scan_semgrep
+import os
+import importlib
 
-def scan_project(project_path, use_semgrep=False):
-    all_findings = []
+# Maps file extensions to language names
+EXTENSION_MAP = {
+    ".py": "python",
+    ".js": "javascript",
+    ".java": "java",
+    ".cpp": "cpp",
+    ".cxx": "cpp",
+    ".cc": "cpp",
+    ".html": "html",
+    ".htm": "html",
+    ".css": "css"
+}
 
-    # Detect files by language
-    language_map = detect_languages(project_path)
+SCANNER_TYPES = ["secrets", "unsafe_calls", "jwt"]
 
-    # Route to each language-specific scanner
-    for lang, files in language_map.items():
-        if lang == "python":
-            for file in files:
-                all_findings += secrets.scan_file(file)
-                all_findings += unsafe_calls.scan_file(file)
-                all_findings += jwt_check.scan_file(file)
+def dynamic_import(lang, scanner_type):
+    """Dynamically import a scanner module for a given language and type."""
+    try:
+        return importlib.import_module(f"scanners.{lang}.{scanner_type}_scanner")
+    except ModuleNotFoundError:
+        return None
 
-        elif lang == "javascript":
-            all_findings += scan_js(files)
+def scan_project(project_path, selected_languages=None):
+    secrets_results = []
+    unsafe_results = []
+    jwt_results = []
 
-        elif lang == "java":
-            all_findings += scan_java(files)
+    for root, _, files in os.walk(project_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            _, ext = os.path.splitext(filename.lower())
 
-        elif lang == "cpp":
-            all_findings += scan_cpp(files)
+            lang = EXTENSION_MAP.get(ext)
+            if not lang:
+                continue
 
-        elif lang == "html":
-            all_findings += scan_html(files)
+            # 🟨 Only scan if selected
+            if selected_languages and lang not in selected_languages:
+                continue
 
-        elif lang == "css":
-            all_findings += scan_css(files)
+            print(f"[SCAN] Scanning {file_path} as {lang}")
 
-    # Optional: run semgrep on all files (multi-language coverage)
-    if use_semgrep:
-        all_code_files = [f for flist in language_map.values() for f in flist]
-        all_findings += scan_semgrep(all_code_files)
+            try:
+                # === Run secrets scanner ===
+                if (secrets_mod := dynamic_import(lang, "secrets")):
+                    secrets_results += secrets_mod.scan_file(file_path)
 
-    return all_findings
+                # === Run unsafe calls scanner ===
+                if (unsafe_mod := dynamic_import(lang, "unsafe_calls")):
+                    unsafe_results += unsafe_mod.scan_file(file_path)
 
+                # === Run JWT scanner ===
+                if (jwt_mod := dynamic_import(lang, "jwt")):
+                    jwt_results += jwt_mod.scan_file(file_path)
 
-# Optional CLI test
-if __name__ == "__main__":
-    from pprint import pprint
-    results = scan_project("uploaded_project", use_semgrep=True)
-    pprint(results)
+            except Exception as e:
+                print(f"[ERROR] Scanning {file_path} failed: {str(e)}")
+
+    return secrets_results, unsafe_results, jwt_results
